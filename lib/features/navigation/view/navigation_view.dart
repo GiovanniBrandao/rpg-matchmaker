@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../dice/view/dice_view.dart';
 import '../../table_search/view/table_search_view.dart';
 import '../../swipe/view/swipe_view.dart';
 import '../../assistant/view/assistant_view.dart';
+import '../../marketplace/view/marketplace_view.dart';
 import '../../profile/view/profile_view.dart';
 
 class MainScreen extends StatefulWidget {
@@ -13,14 +13,13 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  // Define a aba central (Swipe) como inicial se desejar, ou mantenha 0
-  int _currentIndex = 2; 
+  int _currentIndex = 2;
 
   final List<Widget> _screens = const [
-    DiceRollView(),
-    TablesSearchView(),
-    SwipeView(),
+    TableSearchView(),
     AssistantView(),
+    SwipeView(),
+    MarketplaceView(),
     ProfileView(),
   ];
 
@@ -32,6 +31,7 @@ class _MainScreenState extends State<MainScreen> {
         children: _screens,
       ),
       bottomNavigationBar: NavigationBar(
+        height: 68,
         selectedIndex: _currentIndex,
         onDestinationSelected: (int index) {
           setState(() {
@@ -40,24 +40,24 @@ class _MainScreenState extends State<MainScreen> {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.casino_outlined),
-            selectedIcon: Icon(Icons.casino),
-            label: 'Dados',
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Explorar',
           ),
           NavigationDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: 'Mesas',
+            icon: Icon(Icons.auto_stories_outlined),
+            selectedIcon: Icon(Icons.auto_stories),
+            label: 'Mestre',
           ),
           NavigationDestination(
             icon: Icon(Icons.style_outlined),
             selectedIcon: Icon(Icons.style),
-            label: 'Encontrar',
+            label: 'Match',
           ),
           NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'Assistente',
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront),
+            label: 'Loja',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

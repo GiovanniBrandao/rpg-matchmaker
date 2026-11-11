@@ -1,3 +1,4 @@
+// lib/features/profile/view/profile_view.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,8 +26,8 @@ class _ProfileViewState extends State<ProfileView> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _emailController = TextEditingController();
+    _nameController = TextEditingController(text: _viewModel.profile.userName);
+    _emailController = TextEditingController(text: _viewModel.profile.email);
     _passwordController = TextEditingController(text: '******');
 
     _viewModel.addListener(() {
@@ -107,6 +108,7 @@ class _ProfileViewState extends State<ProfileView> {
     final nameCtrl = TextEditingController(text: campaign?.name ?? '');
     final descCtrl = TextEditingController(text: campaign?.description ?? '');
     String selectedSystem = campaign?.system ?? _viewModel.availableSystems.first;
+    bool isOnline = campaign?.isOnline ?? true;
 
     String? selectedImagePath = campaign?.imagePath;
     final ImagePicker picker = ImagePicker();
@@ -152,7 +154,6 @@ class _ProfileViewState extends State<ProfileView> {
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
-
                     Center(
                       child: Column(
                         children: [
@@ -186,20 +187,15 @@ class _ProfileViewState extends State<ProfileView> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome da Campanha',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Nome da Campanha'),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: selectedSystem,
-                      decoration: const InputDecoration(
-                        labelText: 'Sistema de RPG',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Sistema de RPG'),
                       items: _viewModel.availableSystems.map((system) {
                         return DropdownMenuItem(
                           value: system,
@@ -213,21 +209,30 @@ class _ProfileViewState extends State<ProfileView> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    SwitchListTile(
+                      title: const Text('Mesa Online'),
+                      subtitle: Text(isOnline ? 'Jogada via Discord/Roll20' : 'Presencial (usa GPS)'),
+                      value: isOnline,
+                      onChanged: (val) => setModalState(() => isOnline = val),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: descCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Descrição / Resumo da Campanha',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Descrição / Resumo da Campanha'),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
                         final newCamp = MasterModel(
-                          id: campaign?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          id: campaign?.id ?? '',
+                          masterId: campaign?.masterId ?? '',
+                          masterName: campaign?.masterName ?? '',
                           name: nameCtrl.text,
                           system: selectedSystem,
                           description: descCtrl.text,
+                          isOnline: isOnline,
                           imagePath: selectedImagePath,
                         );
 
@@ -260,6 +265,7 @@ class _ProfileViewState extends State<ProfileView> {
     final nameCtrl = TextEditingController(text: character?.name ?? '');
     final classCtrl = TextEditingController(text: character?.characterClass ?? '');
     final bioCtrl = TextEditingController(text: character?.bio ?? '');
+    String selectedSystem = character?.system ?? _viewModel.availableSystems.first;
 
     String? selectedImagePath = character?.imagePath;
     final ImagePicker picker = ImagePicker();
@@ -344,6 +350,22 @@ class _ProfileViewState extends State<ProfileView> {
                       decoration: const InputDecoration(labelText: 'Nome do Personagem'),
                     ),
                     const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedSystem,
+                      decoration: const InputDecoration(labelText: 'Sistema de RPG'),
+                      items: _viewModel.availableSystems.map((system) {
+                        return DropdownMenuItem(
+                          value: system,
+                          child: Text(system),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => selectedSystem = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: classCtrl,
                       decoration: const InputDecoration(labelText: 'Classe / Nível'),
@@ -358,9 +380,12 @@ class _ProfileViewState extends State<ProfileView> {
                     ElevatedButton.icon(
                       onPressed: () {
                         final newChar = CharacterModel(
-                          id: character?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          id: character?.id ?? '',
+                          playerId: character?.playerId ?? '',
+                          playerName: character?.playerName ?? '',
                           name: nameCtrl.text,
                           characterClass: classCtrl.text,
+                          system: selectedSystem,
                           bio: bioCtrl.text,
                           imagePath: selectedImagePath,
                         );
@@ -410,7 +435,6 @@ class _ProfileViewState extends State<ProfileView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ================= SEÇÃO 1: DADOS DA CONTA =================
                 _buildSectionHeader('Dados Pessoais', Icons.person_outline),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -452,7 +476,6 @@ class _ProfileViewState extends State<ProfileView> {
 
                 const SizedBox(height: 28),
 
-                // ================= SEÇÃO 2: MESTRE DE RPG (SWITCH) =================
                 _buildSectionHeader('Modo Mestre (DM/GM)', Icons.shield_outlined),
                 SwitchListTile(
                   title: Text(
@@ -488,7 +511,6 @@ class _ProfileViewState extends State<ProfileView> {
 
                 const SizedBox(height: 28),
 
-                // ================= SEÇÃO 3: FICHAS DOS PERSONAGENS =================
                 _buildSectionHeader('Minhas Fichas de Personagem', Icons.style_outlined),
                 const SizedBox(height: 12),
                 SizedBox(
@@ -508,7 +530,6 @@ class _ProfileViewState extends State<ProfileView> {
 
                 const SizedBox(height: 28),
 
-                // ================= SEÇÃO 4: EXPERIÊNCIA EM RPG =================
                 _buildSectionHeader('Preferências de RPG', Icons.casino_outlined),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<ProficiencyLevel>(
@@ -550,7 +571,6 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // ================= CARDS DE EXIBIÇÃO (PERSONAGEM / CAMPANHA) =================
   Widget _buildCampaignCard(MasterModel campaign) {
     final theme = Theme.of(context);
 
@@ -679,7 +699,6 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // ================= CARDS DE ADICIONAR (+) =================
   Widget _buildAddCampaignCard() {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -750,7 +769,6 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // ================= WIDGET AUXILIAR: CABEÇALHO DE SEÇÃO =================
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
