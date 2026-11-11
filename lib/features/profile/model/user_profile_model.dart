@@ -1,3 +1,4 @@
+// lib/features/profile/model/user_profile_model.dart
 import 'character_model.dart';
 import 'master_model.dart';
 
@@ -61,7 +62,12 @@ class UserProfileModel {
     );
   }
 
-  factory UserProfileModel.fromMap(String id, Map<String, dynamic> map) {
+  factory UserProfileModel.fromMap(
+    String id, 
+    Map<String, dynamic> map, {
+    List<MasterModel> campaigns = const [],
+    List<CharacterModel> characters = const [],
+  }) {
     return UserProfileModel(
       id: id,
       userName: map['name'] ?? '',
@@ -69,15 +75,12 @@ class UserProfileModel {
       isGameMaster: map['role'] == 'master',
       proficiency: ProficiencyLevel.fromString(map['proficiency']),
       favoriteSystems: List<String>.from(map['systems'] ?? []),
-      characters: (map['characters'] as List? ?? [])
-          .map((c) => CharacterModel.fromMap(c))
-          .toList(),
-      campaigns: (map['campaigns'] as List? ?? [])
-          .map((c) => MasterModel.fromMap(c))
-          .toList(),
+      campaigns: campaigns,
+      characters: characters,
     );
   }
 
+  /// Retorna apenas os dados cadastrais para a coleção 'users'
   Map<String, dynamic> toMap() {
     return {
       'name': userName,
@@ -85,8 +88,6 @@ class UserProfileModel {
       'role': isGameMaster ? 'master' : 'player',
       'proficiency': proficiency.name,
       'systems': favoriteSystems,
-      'characters': characters.map((c) => c.toMap()).toList(),
-      'campaigns': campaigns.map((c) => c.toMap()).toList(),
     };
   }
 }

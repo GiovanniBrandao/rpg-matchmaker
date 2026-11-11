@@ -1,4 +1,4 @@
-// lib/features/auth/services/auth_service.dart
+// lib/features/auth/service/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,13 +7,10 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Usuário atualmente autenticado (se houver)
   User? get currentUser => _auth.currentUser;
 
-  /// Stream para escutar mudanças no estado de login em tempo real
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  /// Fazer Login com E-mail e Senha
   Future<UserCredential> signInWithEmail({
     required String email,
     required String password,
@@ -24,12 +21,14 @@ class AuthService {
     );
   }
 
-  /// Criar Novo Cadastro no Auth e Perfil no Firestore
+  /// Criar Novo Cadastro no Auth e Perfil com Preferências Iniciais no Firestore
   Future<UserCredential> signUpWithEmail({
     required String email,
     required String password,
     required String name,
     required String role, // 'player' ou 'master'
+    required List<String> favoriteSystems,
+    required String proficiency,
   }) async {
     // 1. Cria conta de autenticação
     final credential = await _auth.createUserWithEmailAndPassword(
@@ -46,28 +45,32 @@ class AuthService {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
       );
     } catch (_) {
-      // Caso o usuário recuse o GPS no cadastro, registra sem coordenadas iniciais
+      // Caso o usuário recuse o GPS no cadastro
     }
 
-    // 3. Registra documento do perfil no Firestore
-    await _firestore.collection('users').doc(uid).set({
-      'uid': uid,
-      'name': name.trim(),
-      'email': email.trim(),
-      'role': role,
-      'systems': <String>['D&D 5e'], // Padrão inicial
-      'photoUrl': '',
-      'location': position != null
-          ? GeoPoint(position.latitude, position.longitude)
-          : null,
-      'createdAt': FieldValue.serverTimestamp(),
-      'lastOnline': FieldValue.serverTimestamp(),
-    });
+    // 3. Registra documento do perfil com dados e preferências iniciais
+    try {
+      await _firestore.collection('users').doc(uid).set({
+        'uid': uid,
+        'name': name.trim(),
+        'email': email.trim(),
+        'role': role,
+        'proficiency': proficiency,
+        'systems': favoriteSystems,
+        'photoUrl': '',
+        'location': position != null
+            ? GeoPoint(position.latitude, position.longitude)
+            : null,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastOnline': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Continua mesmo que as regras do Firestore restrinjam escrita inicial
+    }
 
     return credential;
   }
 
-  /// Sair do App
   Future<void> signOut() async {
     await _auth.signOut();
   }

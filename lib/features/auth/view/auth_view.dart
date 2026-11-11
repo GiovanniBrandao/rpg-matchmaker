@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../main.dart';
+import '../../profile/model/user_profile_model.dart';
 import '../service/auth_service.dart';
 
 class AuthView extends StatefulWidget {
@@ -15,17 +16,26 @@ class _AuthViewState extends State<AuthView> {
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
 
-  bool _isSignUp = false; // Alterna entre Login (false) e Cadastro (true)
+  bool _isSignUp = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  // Controllers para os campos de texto
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  // Papel padrão no cadastro: Jogador ('player') ou Mestre ('master')
   String _selectedRole = 'player';
+  ProficiencyLevel _selectedProficiency = ProficiencyLevel.intermed;
+  final List<String> _selectedSystems = ['D&D 5e'];
+
+  final List<String> _availableSystems = const [
+    'D&D 5e',
+    'Tormenta20',
+    'Call of Cthulhu',
+    'Pathfinder 2e',
+    'Vampiro: A Máscara',
+    'Ordem Paranormal',
+  ];
 
   @override
   void dispose() {
@@ -38,6 +48,11 @@ class _AuthViewState extends State<AuthView> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_isSignUp && _selectedSystems.isEmpty) {
+      _showErrorSnackBar('Selecione ao menos um sistema de RPG.');
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -47,6 +62,8 @@ class _AuthViewState extends State<AuthView> {
           password: _passwordController.text,
           name: _nameController.text,
           role: _selectedRole,
+          favoriteSystems: _selectedSystems,
+          proficiency: _selectedProficiency.name,
         );
       } else {
         await _authService.signInWithEmail(
@@ -57,7 +74,6 @@ class _AuthViewState extends State<AuthView> {
 
       if (!mounted) return;
 
-      // Navega para a tela principal (NavigationView) limpando a pilha de telas
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const NavigationView()),
@@ -117,8 +133,6 @@ class _AuthViewState extends State<AuthView> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 16),
-                
-                // Título e Subtítulo
                 Text(
                   _isSignUp ? 'Bem-vindo à Aventura!' : 'Que bom ter você de volta!',
                   style: theme.textTheme.headlineSmall?.copyWith(
@@ -128,7 +142,7 @@ class _AuthViewState extends State<AuthView> {
                 const SizedBox(height: 8),
                 Text(
                   _isSignUp
-                      ? 'Preencha os dados abaixo para criar seu perfil de RPG.'
+                      ? 'Preencha os dados abaixo para definir suas preferências de RPG.'
                       : 'Insira suas credenciais para acessar suas mesas e fichas.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -136,7 +150,6 @@ class _AuthViewState extends State<AuthView> {
                 ),
                 const SizedBox(height: 32),
 
-                // Campo: Nome Completo (Apenas no Cadastro)
                 if (_isSignUp) ...[
                   TextFormField(
                     controller: _nameController,
@@ -157,7 +170,6 @@ class _AuthViewState extends State<AuthView> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Seleção de Papel Principal (Jogador ou Mestre)
                   SegmentedButton<String>(
                     segments: const [
                       ButtonSegment(
@@ -179,9 +191,60 @@ class _AuthViewState extends State<AuthView> {
                     },
                   ),
                   const SizedBox(height: 16),
+
+                  DropdownButtonFormField<ProficiencyLevel>(
+                    initialValue: _selectedProficiency,
+                    decoration: InputDecoration(
+                      labelText: 'Nível de Experiência',
+                      prefixIcon: const Icon(Icons.casino_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items: ProficiencyLevel.values.map((level) {
+                      return DropdownMenuItem(
+                        value: level,
+                        child: Text(level.label),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedProficiency = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text(
+                    'Sistemas com Afinidade:',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8.0,
+                    children: _availableSystems.map((system) {
+                      final isSelected = _selectedSystems.contains(system);
+                      return FilterChip(
+                        label: Text(system),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedSystems.add(system);
+                            } else {
+                              _selectedSystems.remove(system);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
                 ],
 
-                // Campo: E-mail
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -205,7 +268,6 @@ class _AuthViewState extends State<AuthView> {
                 ),
                 const SizedBox(height: 16),
 
-                // Campo: Senha
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -238,7 +300,6 @@ class _AuthViewState extends State<AuthView> {
                 ),
                 const SizedBox(height: 24),
 
-                // Botão de Ação Principal (Entrar ou Cadastrar)
                 ElevatedButton(
                   onPressed: _isLoading ? null : _submitForm,
                   style: ElevatedButton.styleFrom(
@@ -265,7 +326,6 @@ class _AuthViewState extends State<AuthView> {
                 ),
                 const SizedBox(height: 16),
 
-                // Alternar entre Telas (Possui conta? / Não tem conta?)
                 TextButton(
                   onPressed: () {
                     setState(() {
@@ -278,6 +338,63 @@ class _AuthViewState extends State<AuthView> {
                         ? 'Já tem uma conta? Faça login'
                         : 'Não tem uma conta? Cadastre-se',
                     style: TextStyle(color: theme.colorScheme.primary),
+                  ),
+                ),
+                const Divider(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.key, size: 18, color: theme.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Credenciais de Teste: aventureiro@rpg.com | Senha: 123456',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _nameController.text = 'Aventureiro da Taverna';
+                                  _emailController.text = 'aventureiro@rpg.com';
+                                  _passwordController.text = '123456';
+                                });
+                              },
+                              child: const Text('Preencher Login'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.tonal(
+                              onPressed: () {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const NavigationView(),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                              child: const Text('Entrar Direto'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
