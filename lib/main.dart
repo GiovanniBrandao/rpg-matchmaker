@@ -1,8 +1,10 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 
-// Importações dos Temas e Telas de Auth
+// Importações dos Temas e Telas de Autenticação
 import 'core/theme/app_theme.dart';
 import 'features/welcome/view/welcome_view.dart';
 
@@ -24,43 +26,81 @@ void main() async {
   runApp(const MyApp());
 }
 
-// Configuração global do App (Tema e Tela de Entrada)
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'App RPG',
+      title: 'RPG Matchmaker',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light, // Alterne para ThemeMode.dark ou ThemeMode.system quando desejar
+      themeMode: ThemeMode.system,
       
-      // Define a WelcomeView (Boas-vindas/Login) como a porta de entrada do aplicativo
-      home: const WelcomeView(),
+      // Define o AuthWrapper para gerenciar o login persistente
+      home: const AuthWrapper(),
     );
   }
 }
 
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Enquanto verifica se existe uma sessão ativa
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // Se o usuário já estiver autenticado no dispositivo
+        if (snapshot.hasData && snapshot.data != null) {
+          return const NavigationView();
+        }
+
+        // Se não estiver logado, redireciona para a WelcomeView / AuthView
+        return const WelcomeView();
+      },
+    );
+  }
+} // Chave de fechamento do AuthWrapper ajustada
+
 // Estrutura da barra de navegação com as 5 abas pós-login
 class NavigationView extends StatefulWidget {
-  const NavigationView({super.key});
+  final bool isGameMaster;
+
+  const NavigationView({
+    super.key,
+    this.isGameMaster = false,
+  });
 
   @override
   State<NavigationView> createState() => _NavigationViewState();
 }
 
 class _NavigationViewState extends State<NavigationView> {
-  int _currentIndex = 2; // Começa na aba central (Swipe)
+  int _currentIndex = 2; // Começa na aba central (Swipe/Encontrar)
 
-  final List<Widget> _screens = const [
-    DiceRollView(),
-    TablesSearchView(),
-    SwipeView(),
-    AssistantView(),
-    ProfileView(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    // Instancia as telas passando os dados de contexto necessários
+    _screens = [
+      const DiceRollView(),
+      TableSearchView(isGameMaster: widget.isGameMaster),
+      const SwipeView(),
+      const AssistantView(),
+      const ProfileView(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

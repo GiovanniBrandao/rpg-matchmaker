@@ -1,6 +1,9 @@
+// lib/features/profile/view/profile_view.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:app_rpg/features/auth/service/auth_service.dart';
+import 'package:app_rpg/features/welcome/view/welcome_view.dart';
 import '../model/character_model.dart';
 import '../model/master_model.dart';
 import '../model/user_profile_model.dart';
@@ -19,34 +22,36 @@ class _ProfileViewState extends State<ProfileView> {
 
   late TextEditingController _nameController;
   late TextEditingController _emailController;
-  late TextEditingController _passwordController;
-  bool _obscurePassword = true;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _emailController = TextEditingController();
-    _passwordController = TextEditingController(text: '******');
+    _nameController = TextEditingController(text: _viewModel.profile.userName);
+    _emailController = TextEditingController(text: _viewModel.profile.email);
 
-    _viewModel.addListener(() {
-      if (mounted) {
-        if (_nameController.text != _viewModel.profile.userName) {
-          _nameController.text = _viewModel.profile.userName;
-        }
-        if (_emailController.text != _viewModel.profile.email) {
-          _emailController.text = _viewModel.profile.email;
-        }
-        setState(() {});
-      }
-    });
+    _viewModel.addListener(_onViewModelChanged);
+  }
+
+  void _onViewModelChanged() {
+    if (!mounted) return;
+
+    if (_viewModel.profile.userName.isNotEmpty &&
+        _nameController.text != _viewModel.profile.userName) {
+      _nameController.text = _viewModel.profile.userName;
+    }
+    if (_viewModel.profile.email.isNotEmpty &&
+        _emailController.text != _viewModel.profile.email) {
+      _emailController.text = _viewModel.profile.email;
+    }
+
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _viewModel.removeListener(_onViewModelChanged);
     _nameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -101,12 +106,73 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
+  // ================= DIÁLOGOS DE CONFIRMAÇÃO DE DELEÇÃO =================
+  void _confirmDeleteCampaign(BuildContext modalCtx, String campaignId) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Excluir Campanha'),
+        content: const Text(
+            'Tem certeza de que deseja excluir esta campanha? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              Navigator.pop(modalCtx);
+              await _viewModel.deleteCampaign(campaignId);
+            },
+            child: const Text('EXCLUIR'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteCharacter(BuildContext modalCtx, String characterId) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Excluir Personagem'),
+        content: const Text(
+            'Tem certeza de que deseja excluir esta ficha de personagem?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              Navigator.pop(modalCtx);
+              await _viewModel.deleteCharacter(characterId);
+            },
+            child: const Text('EXCLUIR'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ================= MODAL: CRIAR / EDITAR CAMPANHA (MESTRE) =================
   void _openCampaignModal({MasterModel? campaign}) {
     final isEditing = campaign != null;
     final nameCtrl = TextEditingController(text: campaign?.name ?? '');
     final descCtrl = TextEditingController(text: campaign?.description ?? '');
-    String selectedSystem = campaign?.system ?? _viewModel.availableSystems.first;
+    String selectedSystem =
+        campaign?.system ?? _viewModel.availableSystems.first;
+    bool isOnline = campaign?.isOnline ?? true;
 
     String? selectedImagePath = campaign?.imagePath;
     final ImagePicker picker = ImagePicker();
@@ -147,12 +213,27 @@ class _ProfileViewState extends State<ProfileView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isEditing ? 'Editar Campanha' : 'Criar Nova Campanha',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isEditing ? 'Editar Campanha' : 'Criar Nova Campanha',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        if (isEditing)
+                          IconButton(
+                            icon: Icon(Icons.delete_outline,
+                                color: Theme.of(context).colorScheme.error),
+                            tooltip: 'Excluir Campanha',
+                            onPressed: () =>
+                                _confirmDeleteCampaign(ctx, campaign.id),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 16),
-
                     Center(
                       child: Column(
                         children: [
@@ -186,20 +267,17 @@ class _ProfileViewState extends State<ProfileView> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome da Campanha',
-                      ),
+                      decoration:
+                          const InputDecoration(labelText: 'Nome da Campanha'),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: selectedSystem,
-                      decoration: const InputDecoration(
-                        labelText: 'Sistema de RPG',
-                      ),
+                      value: selectedSystem,
+                      decoration:
+                          const InputDecoration(labelText: 'Sistema de RPG'),
                       items: _viewModel.availableSystems.map((system) {
                         return DropdownMenuItem(
                           value: system,
@@ -213,21 +291,32 @@ class _ProfileViewState extends State<ProfileView> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    SwitchListTile(
+                      title: const Text('Mesa Online'),
+                      subtitle: Text(
+                          isOnline ? 'Mesa Online' : 'Mesa Presencial'),
+                      value: isOnline,
+                      onChanged: (val) => setModalState(() => isOnline = val),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: descCtrl,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Descrição / Resumo da Campanha',
-                      ),
+                          labelText: 'Descrição / Resumo da Campanha'),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
                         final newCamp = MasterModel(
-                          id: campaign?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          id: campaign?.id ?? '',
+                          masterId: campaign?.masterId ?? '',
+                          masterName: campaign?.masterName ?? '',
                           name: nameCtrl.text,
                           system: selectedSystem,
                           description: descCtrl.text,
+                          isOnline: isOnline,
                           imagePath: selectedImagePath,
                         );
 
@@ -242,7 +331,8 @@ class _ProfileViewState extends State<ProfileView> {
                         minimumSize: const Size.fromHeight(50),
                       ),
                       icon: const Icon(Icons.check),
-                      label: Text(isEditing ? 'SALVAR CAMPANHA' : 'CRIAR CAMPANHA'),
+                      label: Text(
+                          isEditing ? 'SALVAR CAMPANHA' : 'CRIAR CAMPANHA'),
                     ),
                   ],
                 ),
@@ -258,8 +348,11 @@ class _ProfileViewState extends State<ProfileView> {
   void _openCharacterModal({CharacterModel? character}) {
     final isEditing = character != null;
     final nameCtrl = TextEditingController(text: character?.name ?? '');
-    final classCtrl = TextEditingController(text: character?.characterClass ?? '');
+    final classCtrl =
+        TextEditingController(text: character?.characterClass ?? '');
     final bioCtrl = TextEditingController(text: character?.bio ?? '');
+    String selectedSystem =
+        character?.system ?? _viewModel.availableSystems.first;
 
     String? selectedImagePath = character?.imagePath;
     final ImagePicker picker = ImagePicker();
@@ -300,9 +393,25 @@ class _ProfileViewState extends State<ProfileView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isEditing ? 'Editar Personagem' : 'Criar Novo Personagem',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isEditing ? 'Editar Personagem' : 'Criar Novo Personagem',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        if (isEditing)
+                          IconButton(
+                            icon: Icon(Icons.delete_outline,
+                                color: Theme.of(context).colorScheme.error),
+                            tooltip: 'Excluir Personagem',
+                            onPressed: () =>
+                                _confirmDeleteCharacter(ctx, character.id),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Center(
@@ -341,26 +450,49 @@ class _ProfileViewState extends State<ProfileView> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: nameCtrl,
-                      decoration: const InputDecoration(labelText: 'Nome do Personagem'),
+                      decoration:
+                          const InputDecoration(labelText: 'Nome do Personagem'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedSystem,
+                      decoration:
+                          const InputDecoration(labelText: 'Sistema de RPG'),
+                      items: _viewModel.availableSystems.map((system) {
+                        return DropdownMenuItem(
+                          value: system,
+                          child: Text(system),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => selectedSystem = val);
+                        }
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: classCtrl,
-                      decoration: const InputDecoration(labelText: 'Classe / Nível'),
+                      decoration:
+                          const InputDecoration(labelText: 'Classe / Nível'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: bioCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(labelText: 'Descrição / História'),
+                      decoration: const InputDecoration(
+                          labelText: 'Descrição / História'),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
                         final newChar = CharacterModel(
-                          id: character?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          id: character?.id ?? '',
+                          playerId: character?.playerId ?? '',
+                          playerName: character?.playerName ?? '',
                           name: nameCtrl.text,
                           characterClass: classCtrl.text,
+                          system: selectedSystem,
                           bio: bioCtrl.text,
                           imagePath: selectedImagePath,
                         );
@@ -372,7 +504,8 @@ class _ProfileViewState extends State<ProfileView> {
                         }
                         Navigator.pop(ctx);
                       },
-                      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                      style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50)),
                       icon: const Icon(Icons.check),
                       label: Text(isEditing ? 'SALVAR FICHA' : 'CRIAR FICHA'),
                     ),
@@ -401,148 +534,174 @@ class _ProfileViewState extends State<ProfileView> {
       appBar: AppBar(
         title: const Text('Seu Perfil'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sair da conta',
+            onPressed: () => _showLogoutDialog(context),
+          ),
+        ],
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ================= SEÇÃO 1: DADOS DA CONTA =================
-                _buildSectionHeader('Dados Pessoais', Icons.person_outline),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do Usuário',
-                    prefixIcon: Icon(Icons.person),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await _viewModel.refreshData();
+          },
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // CAMPO: NOME DO USUÁRIO
+                  TextFormField(
+                    controller: _nameController,
+                    style: TextStyle(color: theme.colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: 'Nome ou Nickname',
+                      labelStyle:
+                          TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      floatingLabelStyle: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      prefixIcon: const Icon(Icons.person_outline),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                    ),
+                    onFieldSubmitted: (val) {
+                      _viewModel.saveUserData(
+                          name: val, email: _emailController.text);
+                    },
                   ),
-                  onFieldSubmitted: (val) {
-                    _viewModel.saveUserData(
-                      name: val,
-                      email: _emailController.text,
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _emailController,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'E-mail',
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Senha',
-                    prefixIcon: const Icon(Icons.lock),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  const SizedBox(height: 16),
+
+                  // CAMPO: E-MAIL
+                  TextFormField(
+                    controller: _emailController,
+                    readOnly: true,
+                    style: TextStyle(color: theme.colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: 'E-mail',
+                      labelStyle:
+                          TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      floatingLabelStyle: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 16),
 
-                const SizedBox(height: 28),
-
-                // ================= SEÇÃO 2: MESTRE DE RPG (SWITCH) =================
-                _buildSectionHeader('Modo Mestre (DM/GM)', Icons.shield_outlined),
-                SwitchListTile(
-                  title: Text(
-                    'Sou Mestre de RPG',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  // ALTERNADOR: MESTRE OU JOGADOR
+                  SwitchListTile(
+                    title: const Text('Sou Mestre de RPG'),
+                    subtitle:
+                        const Text('Habilita a criação de mesas e campanhas'),
+                    value: profile.isGameMaster,
+                    onChanged: (val) => _viewModel.toggleIsGameMaster(val),
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  subtitle: Text(
-                    'Ative para gerenciar e divulgar suas campanhas',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  value: profile.isGameMaster,
-                  onChanged: _viewModel.toggleIsGameMaster,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                  const SizedBox(height: 16),
 
-                if (profile.isGameMaster) ...[
+                  // DROPDOWN: PROFICIÊNCIA (Usando 'value' para reatividade correta)
+                  DropdownButtonFormField<ProficiencyLevel>(
+                    value: profile.proficiency,
+                    decoration: InputDecoration(
+                      labelText: 'Nível de Experiência',
+                      labelStyle:
+                          TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      floatingLabelStyle: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      prefixIcon: const Icon(Icons.casino_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                    ),
+                    items: ProficiencyLevel.values.map((level) {
+                      return DropdownMenuItem(
+                        value: level,
+                        child: Text(level.label),
+                      );
+                    }).toList(),
+                    onChanged: (val) => _viewModel.setProficiency(val),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // SEÇÃO: SISTEMAS DE AFINIDADE
+                  Text(
+                    'Sistemas com Afinidade:',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8.0,
+                    children: _viewModel.availableSystems.map((system) {
+                      final isSelected =
+                          profile.favoriteSystems.contains(system);
+                      return FilterChip(
+                        label: Text(system),
+                        selected: isSelected,
+                        onSelected: (_) => _viewModel.toggleSystem(system),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // SEÇÃO: CAMPANHAS / MESAS (Visível apenas para Mestres)
+                  if (profile.isGameMaster) ...[
+                    _buildSectionHeader(
+                        'Minhas Campanhas', Icons.castle_outlined),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 180,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: profile.campaigns.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return _buildAddCampaignCard();
+                          }
+                          return _buildCampaignCard(
+                              profile.campaigns[index - 1]);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // SEÇÃO: PERSONAGENS / FICHAS (Visível para todos)
+                  _buildSectionHeader('Meus Personagens', Icons.person_outline),
                   const SizedBox(height: 12),
                   SizedBox(
                     height: 180,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: profile.campaigns.length + 1,
+                      itemCount: profile.characters.length + 1,
                       itemBuilder: (context, index) {
-                        if (index == profile.campaigns.length) {
-                          return _buildAddCampaignCard();
+                        if (index == 0) {
+                          return _buildAddCharacterCard();
                         }
-                        final campaign = profile.campaigns[index];
-                        return _buildCampaignCard(campaign);
+                        return _buildCharacterCard(
+                            profile.characters[index - 1]);
                       },
                     ),
                   ),
                 ],
-
-                const SizedBox(height: 28),
-
-                // ================= SEÇÃO 3: FICHAS DOS PERSONAGENS =================
-                _buildSectionHeader('Minhas Fichas de Personagem', Icons.style_outlined),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 180,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: profile.characters.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == profile.characters.length) {
-                        return _buildAddCharacterCard();
-                      }
-                      final character = profile.characters[index];
-                      return _buildCharacterCard(character);
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // ================= SEÇÃO 4: EXPERIÊNCIA EM RPG =================
-                _buildSectionHeader('Preferências de RPG', Icons.casino_outlined),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<ProficiencyLevel>(
-                  initialValue: profile.proficiency,
-                  decoration: const InputDecoration(
-                    labelText: 'Proficiência',
-                  ),
-                  items: ProficiencyLevel.values.map((level) {
-                    return DropdownMenuItem(value: level, child: Text(level.label));
-                  }).toList(),
-                  onChanged: _viewModel.setProficiency,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Sistemas com Afinidade:',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8.0,
-                  children: _viewModel.availableSystems.map((system) {
-                    final isSelected = profile.favoriteSystems.contains(system);
-                    return FilterChip(
-                      label: Text(system),
-                      selected: isSelected,
-                      onSelected: (_) => _viewModel.toggleSystem(system),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           ),
         ),
@@ -550,7 +709,40 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // ================= CARDS DE EXIBIÇÃO (PERSONAGEM / CAMPANHA) =================
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sair da Conta'),
+        content: const Text('Deseja realmente encerrar a sessão?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await AuthService().signOut();
+
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const WelcomeView()),
+                  (route) => false,
+                );
+              }
+            },
+            child: const Text('SAIR'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCampaignCard(MasterModel campaign) {
     final theme = Theme.of(context);
 
@@ -595,13 +787,19 @@ class _ProfileViewState extends State<ProfileView> {
                   children: [
                     Text(
                       campaign.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       campaign.system,
-                      style: TextStyle(color: theme.colorScheme.secondary, fontSize: 10, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: theme.colorScheme.secondary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -659,13 +857,19 @@ class _ProfileViewState extends State<ProfileView> {
                   children: [
                     Text(
                       character.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       character.characterClass,
-                      style: TextStyle(color: theme.colorScheme.secondary, fontSize: 10, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: theme.colorScheme.secondary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -679,7 +883,6 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // ================= CARDS DE ADICIONAR (+) =================
   Widget _buildAddCampaignCard() {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -750,7 +953,6 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // ================= WIDGET AUXILIAR: CABEÇALHO DE SEÇÃO =================
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [

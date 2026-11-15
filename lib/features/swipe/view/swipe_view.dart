@@ -1,7 +1,8 @@
+// lib/features/swipe/view/swipe_view.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
-
-enum Mode { player, master }
+import '../model/swipe_model.dart';
+import '../viewmodel/swipe_viewmodel.dart';
 
 class SwipeView extends StatefulWidget {
   const SwipeView({super.key});
@@ -11,39 +12,12 @@ class SwipeView extends StatefulWidget {
 }
 
 class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMixin {
-  Mode _currentMode = Mode.player;
+  final SwipeViewModel _viewModel = SwipeViewModel();
 
-  // Lista mockada de cards para o Swipe
-  final List<Map<String, String>> _cards = [
-    {
-      'title': 'Taverna do Dragão',
-      'system': 'D&D 5e',
-      'location': 'Presencial • Bauru, SP (5 km)',
-      'desc': 'Procurando 2 jogadores para campanha longa aos sábados.',
-      'image': '',
-    },
-    {
-      'title': 'Aelar, o Mago',
-      'system': 'Tormenta20',
-      'location': 'Online • Discord',
-      'desc': 'Jogador focado em interpretação, nível 3, disponível fins de semana.',
-      'image': '',
-    },
-    {
-      'title': 'Sombras sobre Arkham',
-      'system': 'Call of Cthulhu',
-      'location': 'Presencial • Piracicaba, SP (12 km)',
-      'desc': 'Mesa investigativa de terror dos anos 1920.',
-      'image': '',
-    },
-  ];
-
-  // Variáveis de Controle da Física de Arraste
   Offset _position = Offset.zero;
   bool _isDragging = false;
   Size _screenSize = Size.zero;
 
-  // Controlador para disparar animação manual via Botões inferiores
   late AnimationController _animController;
   late Animation<Offset> _swipeAnimation;
 
@@ -57,28 +31,28 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
 
     _animController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        _nextCard();
+        _viewModel.removeTopCard();
+        setState(() {
+          _position = Offset.zero;
+        });
         _animController.reset();
       }
+    });
+
+    // Carrega os dados reais do banco ao abrir
+    _viewModel.loadCards();
+    _viewModel.addListener(() {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
-  // Avança para o próximo card
-  void _nextCard() {
-    if (_cards.isEmpty) return;
-    setState(() {
-      _cards.removeLast();
-      _position = Offset.zero;
-    });
-  }
-
-  // Ações ativadas ao Soltar o Card ou Clicar nos Botões
   void _swipeLeft() {
     final theme = Theme.of(context);
     _swipeAnimation = Tween<Offset>(
@@ -126,30 +100,28 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Barra Superior: Switch de Modo e Ícone de Chat
+            // 1. Alternador de Modo
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SegmentedButton<Mode>(
+                  SegmentedButton<SwipeMode>(
                     segments: const [
-                      ButtonSegment<Mode>(
-                        value: Mode.player,
+                      ButtonSegment<SwipeMode>(
+                        value: SwipeMode.player,
                         label: Text('Jogador'),
                         icon: Icon(Icons.person, size: 18),
                       ),
-                      ButtonSegment<Mode>(
-                        value: Mode.master,
+                      ButtonSegment<SwipeMode>(
+                        value: SwipeMode.master,
                         label: Text('Mestre'),
                         icon: Icon(Icons.shield, size: 18),
                       ),
                     ],
-                    selected: {_currentMode},
-                    onSelectionChanged: (Set<Mode> newSelection) {
-                      setState(() {
-                        _currentMode = newSelection.first;
-                      });
+                    selected: {_viewModel.mode},
+                    onSelectionChanged: (newSelection) {
+                      _viewModel.setMode(newSelection.first);
                     },
                     style: const ButtonStyle(
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -166,59 +138,50 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
               ),
             ),
 
-            // 2. Área Central: Pilha de Cards de Match estilo Tinder/Reigns
+            // 2. Pilha de Cards de Match
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: _cards.isEmpty
-                    ? _buildEmptyState(theme)
-                    : Stack(
-                        children: _cards.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final cardData = entry.value;
+                child: _viewModel.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _viewModel.cards.isEmpty
+                        ? _buildEmptyState(theme)
+                        : Stack(
+                            children: _viewModel.cards.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final cardData = entry.value;
 
-                          // Renderiza apenas o card do topo como interativo
-                          if (index == _cards.length - 1) {
-                            return _buildTopCard(cardData, theme);
-                          }
+                              if (index == _viewModel.cards.length - 1) {
+                                return _buildTopCard(cardData, theme);
+                              }
 
-                          // Cards do fundo ficam estáticos abaixo
-                          return _buildBackgroundCard(cardData, theme);
-                        }).toList(),
-                      ),
+                              return _buildBackgroundCard(cardData, theme);
+                            }).toList(),
+                          ),
               ),
             ),
 
-            // 3. Botões de Ação Flutuantes (Disparam a Animação sem arrastar)
+            // 3. Botões Flutuantes
             Padding(
               padding: const EdgeInsets.only(bottom: 16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Botão Recusar / Passar
                   FloatingActionButton.small(
                     heroTag: 'pass_btn',
-                    onPressed: _cards.isEmpty || _animController.isAnimating ? null : _swipeLeft,
+                    onPressed: _viewModel.cards.isEmpty || _animController.isAnimating ? null : _swipeLeft,
                     backgroundColor: theme.colorScheme.surface,
                     child: Icon(Icons.close, color: theme.colorScheme.error, size: 24),
                   ),
-
-                  // Botão Detalhes / Ficha Completa
                   FloatingActionButton.small(
                     heroTag: 'info_btn',
-                    onPressed: _cards.isEmpty
-                        ? null
-                        : () {
-                            // ABRIR MODAL: Exibe a ficha/detalhes completos do card atual
-                          },
+                    onPressed: _viewModel.cards.isEmpty ? null : () {},
                     backgroundColor: theme.colorScheme.surface,
                     child: Icon(Icons.info_outline, color: theme.colorScheme.primary, size: 24),
                   ),
-
-                  // Botão Aceitar / Quero Jogar
                   FloatingActionButton(
                     heroTag: 'match_btn',
-                    onPressed: _cards.isEmpty || _animController.isAnimating ? null : _swipeRight,
+                    onPressed: _viewModel.cards.isEmpty || _animController.isAnimating ? null : _swipeRight,
                     backgroundColor: theme.colorScheme.primary,
                     child: Icon(Icons.casino, color: theme.colorScheme.onPrimary, size: 30),
                   ),
@@ -231,9 +194,7 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
     );
   }
 
-  // Card do Topo (Com suporte a gestos e animação)
-  Widget _buildTopCard(Map<String, String> cardData, ThemeData theme) {
-    // Calculo do ângulo de rotação proporcional ao deslocamento X
+  Widget _buildTopCard(SwipeItemModel cardData, ThemeData theme) {
     final double angle = (_position.dx / _screenSize.width) * (pi / 12);
 
     return AnimatedBuilder(
@@ -246,18 +207,14 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
           child: Transform.rotate(
             angle: _animController.isAnimating ? angle * 2 : angle,
             child: GestureDetector(
-              onPanStart: (details) {
-                setState(() => _isDragging = true);
-              },
+              onPanStart: (_) => setState(() => _isDragging = true),
               onPanUpdate: (details) {
                 setState(() {
                   _position += details.delta;
                 });
               },
-              onPanEnd: (details) {
+              onPanEnd: (_) {
                 setState(() => _isDragging = false);
-
-                // Threshold (limiar) para considerar swipe
                 final threshold = _screenSize.width * 0.35;
 
                 if (_position.dx > threshold) {
@@ -265,16 +222,12 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
                 } else if (_position.dx < -threshold) {
                   _swipeLeft();
                 } else {
-                  // Reseta para o centro se não arrastou o suficiente
-                  setState(() {
-                    _position = Offset.zero;
-                  });
+                  setState(() => _position = Offset.zero);
                 }
               },
               child: Stack(
                 children: [
                   _buildCardContent(cardData, theme),
-                  // Overlay visual (Feedback de Recusar/Aceitar)
                   if (_position.dx != 0 && !_animController.isAnimating) _buildSwipeOverlay(theme),
                 ],
               ),
@@ -285,16 +238,14 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
     );
   }
 
-  // Card de Fundo (Apenas visualização em escala menor)
-  Widget _buildBackgroundCard(Map<String, String> cardData, ThemeData theme) {
+  Widget _buildBackgroundCard(SwipeItemModel cardData, ThemeData theme) {
     return Transform.scale(
       scale: 0.95,
       child: _buildCardContent(cardData, theme),
     );
   }
 
-  // Estrutura Visual do Card
-  Widget _buildCardContent(Map<String, String> cardData, ThemeData theme) {
+  Widget _buildCardContent(SwipeItemModel cardData, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -311,21 +262,18 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
-            // Imagem de Fundo (Ou Placeholder do Tema)
             Positioned.fill(
               child: Container(
                 color: theme.colorScheme.surfaceContainerHighest,
                 child: Center(
                   child: Icon(
-                    _currentMode == Mode.player ? Icons.castle_outlined : Icons.person_outline,
+                    _viewModel.mode == SwipeMode.player ? Icons.castle_outlined : Icons.person_outline,
                     size: 80,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
             ),
-
-            // Gradiente Escuro para Leitura de Texto
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -341,8 +289,6 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
                 ),
               ),
             ),
-
-            // Dados Informativos do Card
             Positioned(
               bottom: 20,
               left: 20,
@@ -354,7 +300,7 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
                     children: [
                       Expanded(
                         child: Text(
-                          cardData['title']!,
+                          cardData.title,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -367,7 +313,7 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
                       const SizedBox(width: 8),
                       Chip(
                         label: Text(
-                          cardData['system']!,
+                          cardData.system,
                           style: TextStyle(
                             color: theme.colorScheme.onSecondary,
                             fontSize: 12,
@@ -386,14 +332,14 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
                       const Icon(Icons.location_on, color: Colors.white70, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        cardData['location']!,
+                        cardData.location,
                         style: const TextStyle(color: Colors.white70),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    cardData['desc']!,
+                    cardData.desc,
                     style: const TextStyle(color: Colors.white, fontSize: 14),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -407,7 +353,6 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
     );
   }
 
-  // Overlay de Feedback de Gestos (Etiquetas "ACEITAR" / "RECUSAR")
   Widget _buildSwipeOverlay(ThemeData theme) {
     final isRight = _position.dx > 0;
     final opacity = (_position.dx.abs() / (_screenSize.width * 0.3)).clamp(0.0, 1.0);
@@ -424,7 +369,7 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               border: Border.all(
-                color: isRight ? Color.fromARGB(255, 236, 202, 7) : theme.colorScheme.error,
+                color: isRight ? const Color.fromARGB(255, 236, 202, 7) : theme.colorScheme.error,
                 width: 3,
               ),
               borderRadius: BorderRadius.circular(12),
@@ -433,7 +378,7 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
             child: Text(
               isRight ? 'ACEITAR' : 'PASSAR',
               style: TextStyle(
-                color: isRight ? Color.fromARGB(255, 236, 202, 7) : theme.colorScheme.error,
+                color: isRight ? const Color.fromARGB(255, 236, 202, 7) : theme.colorScheme.error,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -444,7 +389,6 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
     );
   }
 
-  // Estado para quando acabam os cards disponíveis
   Widget _buildEmptyState(ThemeData theme) {
     return Center(
       child: Column(
@@ -464,7 +408,7 @@ class _SwipeViewState extends State<SwipeView> with SingleTickerProviderStateMix
           ),
           const SizedBox(height: 8),
           Text(
-            'Tente mudar o raio de distância ou alternar o modo no topo.',
+            'Tente mudar o modo no topo ou atualizar a busca.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

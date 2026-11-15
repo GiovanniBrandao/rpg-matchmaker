@@ -18,7 +18,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = const [
     DiceRollView(),
-    TablesSearchView(),
+    TableSearchView(),
     SwipeView(),
     AssistantView(),
     ProfileView(),

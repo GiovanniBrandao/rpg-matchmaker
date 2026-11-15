@@ -2,19 +2,22 @@ import 'character_model.dart';
 import 'master_model.dart';
 
 enum ProficiencyLevel {
-  inexperient('Inexperiente'),
-  beginner('Iniciante'),
+  iniciante('Iniciante'),
   intermed('Intermediário'),
-  experienced('Experiente');
+  avancado('Avançado');
 
   final String label;
   const ProficiencyLevel(this.label);
 
-  static ProficiencyLevel fromString(String? value) {
-    return ProficiencyLevel.values.firstWhere(
-      (e) => e.name == value,
-      orElse: () => ProficiencyLevel.intermed,
-    );
+  static ProficiencyLevel fromString(String? val) {
+    switch (val) {
+      case 'iniciante':
+        return ProficiencyLevel.iniciante;
+      case 'avancado':
+        return ProficiencyLevel.avancado;
+      default:
+        return ProficiencyLevel.intermed;
+    }
   }
 }
 
@@ -22,9 +25,9 @@ class UserProfileModel {
   final String id;
   final String userName;
   final String email;
-  final List<String> favoriteSystems;
-  final ProficiencyLevel proficiency;
   final bool isGameMaster;
+  final ProficiencyLevel proficiency;
+  final List<String> favoriteSystems;
   final List<MasterModel> campaigns;
   final List<CharacterModel> characters;
 
@@ -32,61 +35,52 @@ class UserProfileModel {
     required this.id,
     required this.userName,
     required this.email,
-    required this.favoriteSystems,
-    required this.proficiency,
-    this.characters = const [],
     this.isGameMaster = false,
+    required this.proficiency,
+    required this.favoriteSystems,
     this.campaigns = const [],
+    this.characters = const [],
   });
+
+  factory UserProfileModel.fromMap(
+    String id,
+    Map<String, dynamic> map, {
+    List<MasterModel>? campaigns,
+    List<CharacterModel>? characters,
+  }) {
+    return UserProfileModel(
+      id: id,
+      userName: (map['name'] as String?)?.isNotEmpty == true
+          ? map['name']
+          : (map['userName'] ?? ''),
+      email: map['email'] ?? '',
+      isGameMaster: map['role'] == 'master',
+      proficiency: ProficiencyLevel.fromString(map['proficiency'] as String?),
+      favoriteSystems: List<String>.from(map['systems'] ?? []),
+      campaigns: campaigns ?? [],
+      characters: characters ?? [],
+    );
+  }
 
   UserProfileModel copyWith({
     String? id,
     String? userName,
     String? email,
-    List<String>? favoriteSystems,
-    ProficiencyLevel? proficiency,
-    List<CharacterModel>? characters,
     bool? isGameMaster,
+    ProficiencyLevel? proficiency,
+    List<String>? favoriteSystems,
     List<MasterModel>? campaigns,
+    List<CharacterModel>? characters,
   }) {
     return UserProfileModel(
       id: id ?? this.id,
       userName: userName ?? this.userName,
       email: email ?? this.email,
-      favoriteSystems: favoriteSystems ?? this.favoriteSystems,
-      proficiency: proficiency ?? this.proficiency,
-      characters: characters ?? this.characters,
       isGameMaster: isGameMaster ?? this.isGameMaster,
+      proficiency: proficiency ?? this.proficiency,
+      favoriteSystems: favoriteSystems ?? this.favoriteSystems,
       campaigns: campaigns ?? this.campaigns,
+      characters: characters ?? this.characters,
     );
-  }
-
-  factory UserProfileModel.fromMap(String id, Map<String, dynamic> map) {
-    return UserProfileModel(
-      id: id,
-      userName: map['name'] ?? '',
-      email: map['email'] ?? '',
-      isGameMaster: map['role'] == 'master',
-      proficiency: ProficiencyLevel.fromString(map['proficiency']),
-      favoriteSystems: List<String>.from(map['systems'] ?? []),
-      characters: (map['characters'] as List? ?? [])
-          .map((c) => CharacterModel.fromMap(c))
-          .toList(),
-      campaigns: (map['campaigns'] as List? ?? [])
-          .map((c) => MasterModel.fromMap(c))
-          .toList(),
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'name': userName,
-      'email': email,
-      'role': isGameMaster ? 'master' : 'player',
-      'proficiency': proficiency.name,
-      'systems': favoriteSystems,
-      'characters': characters.map((c) => c.toMap()).toList(),
-      'campaigns': campaigns.map((c) => c.toMap()).toList(),
-    };
   }
 }

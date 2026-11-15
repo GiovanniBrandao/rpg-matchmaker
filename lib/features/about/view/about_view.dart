@@ -46,7 +46,7 @@ class AboutView extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min, // Mantém a coluna compacta
                 children: [
                   Text(
-                    'Desenvolvido por Giovanni',
+                    'Desenvolvido por PDQ Productions',
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
