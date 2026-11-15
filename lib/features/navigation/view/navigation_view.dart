@@ -4,7 +4,6 @@ import '../../swipe/view/swipe_view.dart';
 import '../../assistant/view/assistant_view.dart';
 import '../../marketplace/view/marketplace_view.dart';
 import '../../profile/view/profile_view.dart';
-import '../../dice/view/dice_view.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});

@@ -15,7 +15,6 @@ import 'features/swipe/view/swipe_view.dart';
 import 'features/assistant/view/assistant_view.dart';
 import 'features/marketplace/view/marketplace_view.dart';
 import 'features/profile/view/profile_view.dart';
-import 'features/dice/view/dice_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
