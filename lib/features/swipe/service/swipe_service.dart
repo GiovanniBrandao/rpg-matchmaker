@@ -24,11 +24,12 @@ class SwipeService {
       }
     }
 
-    if (permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.deniedForever ||
+        permission == LocationPermission.denied) {
       debugPrint('🚫 Permissão de GPS bloqueada nas configurações.');
       return null;
-    }
-
+        }
+        
     final pos = await Geolocator.getCurrentPosition();
     debugPrint('📍 GPS OK: Lat ${pos.latitude}, Lng ${pos.longitude}');
     return pos;

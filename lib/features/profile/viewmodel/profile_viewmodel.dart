@@ -1,3 +1,4 @@
+// lib/features/profile/viewmodel/profile_viewmodel.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,8 +8,21 @@ import '../model/user_profile_model.dart';
 import '../model/master_model.dart';
 
 class ProfileViewModel extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseAuth? get _auth {
+    try {
+      return FirebaseAuth.instance;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  FirebaseFirestore? get _firestore {
+    try {
+      return FirebaseFirestore.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   StreamSubscription? _userSub;
   StreamSubscription? _campaignsSub;
@@ -21,14 +35,20 @@ class ProfileViewModel extends ChangeNotifier {
     email: '',
     favoriteSystems: [],
     proficiency: ProficiencyLevel.intermed,
+    characters: [],
+    campaigns: [],
   );
 
   bool get isLoading => _isLoading;
   UserProfileModel get profile => _profile;
 
   final List<String> availableSystems = const [
-    'D&D 5e', 'Tormenta20', 'Call of Cthulhu', 
-    'Pathfinder 2e', 'Vampiro: A Máscara', 'Ordem Paranormal'
+    'D&D 5e',
+    'Tormenta20',
+    'Call of Cthulhu',
+    'Pathfinder 2e',
+    'Vampiro: A Máscara',
+    'Ordem Paranormal',
   ];
 
   ProfileViewModel() {
@@ -47,14 +67,16 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   void _listenToUserData() {
-    final user = _auth.currentUser;
-    if (user == null) {
+    final user = _auth?.currentUser;
+    final fs = _firestore;
+    if (user == null || fs == null) {
       _isLoading = false;
       notifyListeners();
       return;
     }
 
-    _userSub = _firestore.collection('users').doc(user.uid).snapshots().listen(
+    // 1. Escuta os dados cadastrais do usuário
+    _userSub = fs.collection('users').doc(user.uid).snapshots().listen(
       (snapshot) async {
         if (snapshot.exists && snapshot.data() != null) {
           try {
@@ -70,7 +92,7 @@ class ProfileViewModel extends ChangeNotifier {
           _isLoading = false;
           notifyListeners();
         } else {
-          await _firestore.collection('users').doc(user.uid).set({
+          await fs.collection('users').doc(user.uid).set({
             'name': user.displayName ?? 'Novo Usuário',
             'email': user.email ?? '',
             'role': 'player',
@@ -88,7 +110,8 @@ class ProfileViewModel extends ChangeNotifier {
       },
     );
 
-    _campaignsSub = _firestore
+    // 2. Escuta as campanhas do mestre na coleção raiz 'campaigns'
+    _campaignsSub = fs
         .collection('campaigns')
         .where('masterId', isEqualTo: user.uid)
         .snapshots()
@@ -105,7 +128,8 @@ class ProfileViewModel extends ChangeNotifier {
       },
     );
 
-    _charactersSub = _firestore
+    // 3. Escuta os personagens do jogador na coleção raiz 'characters'
+    _charactersSub = fs
         .collection('characters')
         .where('playerId', isEqualTo: user.uid)
         .snapshots()
@@ -124,9 +148,14 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<void> _updateField(Map<String, dynamic> data) async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update(data);
+    final user = _auth?.currentUser;
+    final fs = _firestore;
+    if (user != null && fs != null) {
+      try {
+        await fs.collection('users').doc(user.uid).update(data);
+      } catch (e) {
+        debugPrint('Erro ao atualizar perfil: $e');
+      }
     }
   }
 
@@ -137,64 +166,74 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   Future<void> addCampaign(MasterModel campaign) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+    final user = _auth?.currentUser;
+    final fs = _firestore;
+    if (user == null || fs == null) return;
 
     final campaignData = campaign.copyWith(
       masterId: user.uid,
       masterName: _profile.userName.isNotEmpty ? _profile.userName : 'Mestre',
     ).toMap();
 
-    await _firestore.collection('campaigns').add(campaignData);
+    await fs.collection('campaigns').add(campaignData);
   }
 
   Future<void> updateCampaign(MasterModel updatedCampaign) async {
-    await _firestore
+    final fs = _firestore;
+    if (fs == null || updatedCampaign.id.isEmpty) return;
+
+    await fs
         .collection('campaigns')
         .doc(updatedCampaign.id)
         .update(updatedCampaign.toMap());
   }
 
+  Future<void> deleteCampaign(String campaignId) async {
+    final fs = _firestore;
+    if (fs == null || campaignId.isEmpty) return;
+
+    try {
+      await fs.collection('campaigns').doc(campaignId).delete();
+    } catch (e) {
+      debugPrint('Erro ao deletar campanha: $e');
+    }
+  }
+
   Future<void> addCharacter(CharacterModel character) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+    final user = _auth?.currentUser;
+    final fs = _firestore;
+    if (user == null || fs == null) return;
 
     final charData = character.copyWith(
       playerId: user.uid,
       playerName: _profile.userName.isNotEmpty ? _profile.userName : 'Jogador',
     ).toMap();
 
-    await _firestore.collection('characters').add(charData);
-  }
-
-  // ================= DELEÇÃO DE CAMPANHAS E PERSONAGENS =================
-
-  Future<void> deleteCampaign(String campaignId) async {
-    if (campaignId.isEmpty) return;
-    try {
-      await _firestore.collection('campaigns').doc(campaignId).delete();
-    } catch (e) {
-      debugPrint('Erro ao deletar campanha: $e');
-    }
-  }
-
-  Future<void> deleteCharacter(String characterId) async {
-    if (characterId.isEmpty) return;
-    try {
-      await _firestore.collection('characters').doc(characterId).delete();
-    } catch (e) {
-      debugPrint('Erro ao deletar personagem: $e');
-    }
+    await fs.collection('characters').add(charData);
   }
 
   Future<void> updateCharacter(CharacterModel updatedChar) async {
-    await _firestore
+    final fs = _firestore;
+    if (fs == null || updatedChar.id.isEmpty) return;
+
+    await fs
         .collection('characters')
         .doc(updatedChar.id)
         .update(updatedChar.toMap());
   }
 
- void toggleSystem(String system) {
+  Future<void> deleteCharacter(String characterId) async {
+    final fs = _firestore;
+    if (fs == null || characterId.isEmpty) return;
+
+    try {
+      await fs.collection('characters').doc(characterId).delete();
+    } catch (e) {
+      debugPrint('Erro ao deletar personagem: $e');
+    }
+  }
+
+  void toggleSystem(String system) {
     final current = List<String>.from(_profile.favoriteSystems);
     current.contains(system) ? current.remove(system) : current.add(system);
     _profile = _profile.copyWith(favoriteSystems: current);
@@ -211,6 +250,8 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   void saveUserData({required String name, required String email}) {
+    _profile = _profile.copyWith(userName: name, email: email);
+    notifyListeners();
     _updateField({'name': name, 'email': email});
   }
 

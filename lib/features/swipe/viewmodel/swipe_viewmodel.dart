@@ -1,6 +1,5 @@
 // lib/features/swipe/viewmodel/swipe_viewmodel.dart
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import '../model/swipe_model.dart';
 import '../service/swipe_service.dart';
 
@@ -12,7 +11,6 @@ class SwipeViewModel extends ChangeNotifier {
   SwipeMode _mode = SwipeMode.player;
   bool _isLoading = false;
   List<SwipeItemModel> _cards = [];
-  Position? _currentPosition;
 
   SwipeMode get mode => _mode;
   bool get isLoading => _isLoading;
@@ -29,18 +27,16 @@ class SwipeViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Solicita localização (se necessário para cálculos de distância)
-      _currentPosition = await _service.getUserLocation();
+      await _service.getUserLocation();
 
       if (_mode == SwipeMode.player) {
-        // Jogador busca Mesas para jogar
         _cards = await _service.fetchCampaignCards();
       } else {
-        // Mestre busca Personagens/Jogadores
         _cards = await _service.fetchCharacterCards();
       }
     } catch (e) {
-      debugPrint("Erro ao carregar cards: $e");
+      debugPrint('Erro ao carregar cards no Swipe: $e');
+      _cards = [];
     } finally {
       _isLoading = false;
       notifyListeners();

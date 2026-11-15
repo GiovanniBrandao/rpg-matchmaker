@@ -340,6 +340,63 @@ class _AuthViewState extends State<AuthView> {
                     style: TextStyle(color: theme.colorScheme.primary),
                   ),
                 ),
+                const Divider(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.key, size: 18, color: theme.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Credenciais de Teste: aventureiro@rpg.com | Senha: 123456',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _nameController.text = 'Aventureiro da Taverna';
+                                  _emailController.text = 'aventureiro@rpg.com';
+                                  _passwordController.text = '123456';
+                                });
+                              },
+                              child: const Text('Preencher Login'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.tonal(
+                              onPressed: () {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const NavigationView(),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                              child: const Text('Entrar Direto'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

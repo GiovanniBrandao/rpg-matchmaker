@@ -1,3 +1,4 @@
+// lib/features/profile/model/user_profile_model.dart
 import 'character_model.dart';
 import 'master_model.dart';
 

@@ -275,7 +275,7 @@ class _ProfileViewState extends State<ProfileView> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedSystem,
+                      initialValue: selectedSystem,
                       decoration:
                           const InputDecoration(labelText: 'Sistema de RPG'),
                       items: _viewModel.availableSystems.map((system) {
@@ -455,7 +455,7 @@ class _ProfileViewState extends State<ProfileView> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedSystem,
+                      initialValue: selectedSystem,
                       decoration:
                           const InputDecoration(labelText: 'Sistema de RPG'),
                       items: _viewModel.availableSystems.map((system) {
@@ -615,7 +615,7 @@ class _ProfileViewState extends State<ProfileView> {
 
                   // DROPDOWN: PROFICIÊNCIA (Usando 'value' para reatividade correta)
                   DropdownButtonFormField<ProficiencyLevel>(
-                    value: profile.proficiency,
+                    initialValue: profile.proficiency,
                     decoration: InputDecoration(
                       labelText: 'Nível de Experiência',
                       labelStyle:

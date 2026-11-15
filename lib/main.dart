@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
@@ -9,11 +10,12 @@ import 'core/theme/app_theme.dart';
 import 'features/welcome/view/welcome_view.dart';
 
 // Importações das Abas Principais
-import 'features/dice/view/dice_view.dart';
 import 'features/table_search/view/table_search_view.dart';
 import 'features/swipe/view/swipe_view.dart';
 import 'features/assistant/view/assistant_view.dart';
+import 'features/marketplace/view/marketplace_view.dart';
 import 'features/profile/view/profile_view.dart';
+import 'features/dice/view/dice_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -85,7 +87,8 @@ class NavigationView extends StatefulWidget {
 }
 
 class _NavigationViewState extends State<NavigationView> {
-  int _currentIndex = 2; // Começa na aba central (Swipe/Encontrar)
+  int _currentIndex = 2; // Começa na aba central de Match (no meio da navbar)
+  final Set<int> _visitedTabs = {2};
 
   late final List<Widget> _screens;
 
@@ -94,10 +97,10 @@ class _NavigationViewState extends State<NavigationView> {
     super.initState();
     // Instancia as telas passando os dados de contexto necessários
     _screens = [
-      const DiceRollView(),
       TableSearchView(isGameMaster: widget.isGameMaster),
-      const SwipeView(),
       const AssistantView(),
+      const SwipeView(),
+      const MarketplaceView(),
       const ProfileView(),
     ];
   }
@@ -107,35 +110,42 @@ class _NavigationViewState extends State<NavigationView> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          for (var i = 0; i < _screens.length; i++)
+            _visitedTabs.contains(i) ? _screens[i] : const SizedBox.shrink(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
+        height: 68,
         selectedIndex: _currentIndex,
         onDestinationSelected: (int index) {
+          if (_currentIndex == index) return;
+          HapticFeedback.selectionClick();
           setState(() {
             _currentIndex = index;
+            _visitedTabs.add(index);
           });
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.casino_outlined),
-            selectedIcon: Icon(Icons.casino),
-            label: 'Dados',
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Explorar',
           ),
           NavigationDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: 'Mesas',
+            icon: Icon(Icons.auto_stories_outlined),
+            selectedIcon: Icon(Icons.auto_stories),
+            label: 'Mestre',
           ),
           NavigationDestination(
             icon: Icon(Icons.style_outlined),
             selectedIcon: Icon(Icons.style),
-            label: 'Encontrar',
+            label: 'Match',
           ),
           NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'Assistente',
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront),
+            label: 'Loja',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
