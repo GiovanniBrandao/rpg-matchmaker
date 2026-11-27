@@ -4,7 +4,7 @@ Um projeto em flutter de um aplicativo voltado para unir pessoas do ramo do RPG 
 
 ## 📥 Download
 
-Você pode baixar a versão mais recente clicando [![neste link para a pagina do github)](https://shields.io)]([https://github.com](https://github.com/GiovanniBrandao/rpg-matchmaker/releases/tag/v1.0.0-beta)), e baixando o arquivo APK.
+Você pode baixar a versão mais recente clicando [![neste link para a pagina do github](https://shields.io)]([https://github.com](https://github.com/GiovanniBrandao/rpg-matchmaker/releases/tag/v1.0.0-beta)), e baixando o arquivo APK.
 
 ### Como instalar
 1. Acesse a aba **Releases** no link acima.
